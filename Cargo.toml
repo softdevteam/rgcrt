@@ -1,0 +1,12 @@
+[package]
+name = "rgcrt"
+version = "0.1.0"
+authors = ["Jacob Hughes <jh@jakehughes.uk>"]
+edition = "2018"
+
+[lib]
+name = "gcrt"
+path = "src/lib.rs"
+
+[dependencies]
+ykstackmaps = { git = "https://github.com/softdevteam/ykstackmaps" }
