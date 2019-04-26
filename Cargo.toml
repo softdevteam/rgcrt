@@ -10,3 +10,4 @@ path = "src/lib.rs"
 
 [dependencies]
 ykstackmaps = { git = "https://github.com/softdevteam/ykstackmaps" }
+static_assertions = "0.3"

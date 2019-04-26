@@ -1,3 +1,4 @@
+use static_assertions::assert_eq_size;
 use std::{collections::HashMap, path::Path};
 use ykstackmaps::{LocKind, LocOffset, SMRec, StackMapParser};
 
@@ -118,6 +119,9 @@ fn gen_safepoint_roots(stackmap: SMRec) -> SafepointRoots {
 /// and generate an efficient hashmap -- keyed by a function's return address --
 /// which can be queried by the collector.
 pub fn gen_safepoint_table<P: AsRef<Path>>(path: P) -> HashMap<ReturnAddress, SafepointRoots> {
+    // Ensure that this is used only on 64 bit architecture.
+    assert_eq_size!(u64, usize);
+
     let parser = StackMapParser::new(path.as_ref()).unwrap();
 
     let mut frames = HashMap::new();
