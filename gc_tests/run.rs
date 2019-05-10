@@ -41,12 +41,16 @@ use std::{
 use lazy_static::lazy_static;
 use regex::{Regex, RegexBuilder};
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
+use cargo_metadata::MetadataCommand;
+use tempdir::TempDir;
 
 const RUST_EXT: &'static str = "rs";
+const RUSTC_PATH_ENV: &'static str = "RUSTC_PATH";
+const RUSTC_BIN: &'static str = "rustc";
 const TESTS_DIR: &'static str = "gc_tests";
 const WILDCARD: &'static str = "...";
 const RUN_FILE: &'static str = "run.rs";
-const TEST_OBJ_PATH: &'static str = "TEST_OBJ_PATH";
+const TMP_PREFIX: &'static str = "test";
 
 enum ExpType {
     CompileTimeError,
@@ -72,6 +76,11 @@ fn find_tests() -> Vec<PathBuf> {
         .filter(|x| x.extension().unwrap() == RUST_EXT)
         .filter(|x| x.file_name().unwrap() != RUN_FILE)
         .collect()
+}
+
+fn mk_tmpdir() -> TempDir {
+    let target = MetadataCommand::new().exec().unwrap().target_directory;
+    TempDir::new_in(target, TMP_PREFIX).expect("Can't create temp directory")
 }
 
 fn write_with_colour(s: &str, colour: Color) {
@@ -140,7 +149,7 @@ fn fuzzy_match(pattern: &str, s: &[u8]) -> bool {
     true
 }
 
-fn run_test(path: PathBuf) -> bool {
+fn run_test(path: PathBuf, bindir: &str) -> bool {
     let test_name = path.file_name().unwrap().to_str().unwrap();
     eprint!("test lang_tests::{} ... ", test_name);
     let d = read_to_string(&path).unwrap();
@@ -167,11 +176,10 @@ fn run_test(path: PathBuf) -> bool {
         "run-time output:" => ExpType::RunTimeOutput,
         x => panic!("Unknown type '{}'", x)
     };
-
     let expbody = exp.lines().skip(1).collect::<Vec<_>>().join("\n");
-    let bindir = env::var(TEST_OBJ_PATH).unwrap();
-    let compile = Command::new("rustc")
-        .args(&["--out-dir", &bindir, path.to_str().unwrap()])
+    let rustpath = env::var(RUSTC_PATH_ENV).unwrap_or_else(|_| RUSTC_BIN.to_string());
+    let compile = Command::new(rustpath)
+        .args(&["--out-dir", bindir, path.to_str().unwrap()])
         .output()
         .expect("Couldn't run command");
 
@@ -233,18 +241,13 @@ fn main() {
     eprint!("\nrunning {} tests", all_tests.len());
     let mut any_failed = false;
 
-    // Set up a tmp directory to store our test object binaries and SOs
-    let bindir = env::var(TEST_OBJ_PATH).unwrap();
-    if !Path::new(&bindir).exists() {
-        Command::new("mkdir")
-            .args(&[&bindir])
-            .output()
-            .expect("Couldn't build object directory");
-    }
+    // Set up a scratch directory for the object files which are compiled and
+    // run during each test. This dir is deleted on drop.
+    let bindir = mk_tmpdir();
 
     for t in all_tests {
         eprintln!();
-        if !run_test(t) {
+        if !run_test(t, &bindir.path().to_str().unwrap()) {
             any_failed = true;
         }
     }
