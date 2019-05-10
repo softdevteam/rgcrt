@@ -59,7 +59,7 @@ enum ExpType {
 }
 
 lazy_static! {
-    static ref EXPECTED: Regex = RegexBuilder::new(r#"^(/{3}(.*?)\n)*^"#)
+    static ref EXPECTED: Regex = RegexBuilder::new(r#"^(/{3}.*?\n)+^"#)
         .multi_line(true)
         .dot_matches_new_line(false)
         .build()

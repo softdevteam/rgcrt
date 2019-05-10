@@ -1,6 +1,20 @@
+#![feature(gc)]
+
 /// run-time output:
 /// Hello world
 
+extern crate core;
+use core::gc::Scan;
+
+struct S {}
+
+impl Scan for S {
+    fn scan(&self) {
+        println!("Hello world")
+    }
+}
+
 fn main() {
-    println!("Hello world")
+    let s = S{};
+    s.scan();
 }
