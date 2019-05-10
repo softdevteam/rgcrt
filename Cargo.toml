@@ -10,3 +10,13 @@ path = "src/lib.rs"
 
 [dependencies]
 ykstackmaps = { git = "https://github.com/softdevteam/ykstackmaps" }
+
+[dev-dependencies]
+lazy_static = "1.3"
+regex = "1.1"
+termcolor = "1.0"
+
+[[test]]
+name = "gc_tests"
+path = "gc_tests/run.rs"
+harness = false
