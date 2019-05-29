@@ -62,13 +62,77 @@ impl Collector {
         unimplemented!()
     }
 
-    // Perform the actual garbage collection. We use the name `reclaim` to
-    // disambiguate from Rust's notion of `collect` on iterators.
+    /// Perform the actual garbage collection. We use the name `reclaim` instead
+    /// of collect to disambiguate from Rust's notion of `collect` on iterators.
     pub(crate) fn reclaim(&self) {
-        unimplemented!()
+        eprintln!("Collection is no-op: not yet implemented")
+    }
+
+    /// Reserves a block in memory of the given size, returning a pointer which
+    /// can be used by the allocator to copy memory.
+    /// XXX: Since `reclaim` is unimplemented, this is just pointer bump until
+    /// the heap is OOM.
+    fn reserve_block<T>(&self, size: usize) -> Result<*mut T, GcErr> {
+        let hptr = self.hptr.get();
+        let obj_end = hptr as usize + size;
+
+        if (obj_end as usize) < self.hend.get() {
+            self.hptr.set(obj_end as *mut usize);
+            Ok(hptr as *mut T)
+        } else {
+            Err(GcErr::OOM("No free space available".to_string()))
+        }
     }
 
     pub(crate) fn alloc_obj<T: Scan>(&self, object: T) -> Result<*mut T, GcErr> {
-        unimplemented!()
+        let obj_size = std::mem::size_of::<T>();
+        // Try and get a pointer into the heap to store the object, if that
+        // fails, we'll perform a GC and try again.
+        let hptr = self.reserve_block(obj_size).or_else(|_| {
+            self.reclaim();
+            self.reserve_block(obj_size)
+        })?;
+
+        // Use memcpy to copy `object` to the GC heap because we can guarantee
+        // that `object`'s src address will never overlap with its new position
+        // on the heap. This is less expensive than `memmove`, as we don't need
+        // first move `object` to a temporary buffer.
+        unsafe { std::ptr::copy_nonoverlapping::<T>(&object, hptr, 1) };
+        Ok(hptr as *mut T)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(Debug, PartialEq, Eq, Clone)]
+    struct S(usize, u32);
+    impl Scan for S {}
+
+    #[test]
+    fn simple_alloc() {
+        let s = S(1234, 5678);
+        let gc = Collector::new();
+        gc.mk_heap(1024);
+
+        let raw_gcptr = gc.alloc_obj(s).unwrap();
+
+        let gcval = unsafe { &*raw_gcptr };
+        assert_eq!(*gcval, S(1234, 5678));
+    }
+
+    #[test]
+    fn alloc_err_if_oom() {
+        let s = S(1234, 5678);
+        let gc = Collector::new();
+        gc.mk_heap(32);
+
+        let obj1 = gc.alloc_obj(s.clone());
+        let obj2 = gc.alloc_obj(s.clone());
+        eprintln!("{:?}", obj2);
+
+        assert!(obj1.is_ok());
+        assert!(obj2.is_err());
     }
 }

@@ -31,6 +31,7 @@ pub trait Scan {
     fn scan(&self) {}
 }
 
+#[derive(Debug)]
 pub enum GcErr {
     OOM(String),
 }
