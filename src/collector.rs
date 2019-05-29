@@ -13,9 +13,6 @@ use crate::{
 /// The size of the heap in bytes
 const HSIZE: usize = 1024;
 
-/// The byte alignment of the heap
-const HALIGN: usize = 4;
-
 pub(crate) struct Collector {
     hptr: Cell<*mut usize>,
     hstart: Cell<usize>,
@@ -48,8 +45,8 @@ impl Collector {
         self.collect_next.get()
     }
 
-    pub fn mk_heap(&self) {
-        let layout = Layout::from_size_align(HSIZE, HALIGN).unwrap();
+    pub fn mk_heap(&self, size: usize) {
+        let layout = Layout::array::<u8>(size).unwrap();
         let ptr = unsafe { alloc(layout) as *mut usize };
 
         if ptr.is_null() {
@@ -58,7 +55,7 @@ impl Collector {
 
         self.hptr.set(ptr);
         self.hstart.set(ptr as usize);
-        self.hend.set(ptr as usize + HSIZE);
+        self.hend.set(ptr as usize + size);
     }
 
     pub fn mk_root_table<P: AsRef<Path>>(&self, path: P) {
